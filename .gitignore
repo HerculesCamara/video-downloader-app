@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# downloads temporários
+/public/downloads/*
+!/public/downloads/.gitkeep
+
+# backend (vai para repositório separado)
+/backend/
