@@ -113,7 +113,6 @@ export default function DownloadClipPage() {
                 // IMPORTANTE: Use a URL HTTPS do seu backend Nginx
                 action={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/api/download-segment`}
                 style={{ display: 'none' }}
-                target="_blank" // Opcional: abre a resposta em nova aba (útil para debug)
             >
                 <input type="hidden" name="videoId" value={videoId} />
                 <input type="hidden" name="start_time" value={startTime} />
