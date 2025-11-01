@@ -6,14 +6,13 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [modalState, setModalState] = useState('loading'); // 'loading', 'success', 'error'
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
+  // Não precisamos mais de 'modalState', 'result', ou 'error'
   const [formError, setFormError] = useState('');
 
-  // Função para processar o download
-  const handleDownload = async (e) => {
-    e.preventDefault();
+  // --- MUDANÇA 1: Função de submit do formulário principal ---
+  // Esta função agora SÓ valida os dados e ABRE O MODAL.
+  const handleOpenModal = (e) => {
+    e.preventDefault(); // Impede o envio do formulário
 
     // Validação do checkbox
     if (!agreed) {
@@ -27,86 +26,29 @@ export default function Home() {
       return;
     }
 
-    // Abrir modal e iniciar processamento
+    // Limpa erros e MOSTRA O MODAL
     setFormError('');
     setShowModal(true);
-    setModalState('loading');
-    setResult(null);
-    setError('');
+    
+    // O 'fetch' foi REMOVIDO daqui.
+  };
 
-    try {
-      // Chamar API do backend - agora retorna streaming direto
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-      const downloadUrl = `${apiUrl}/api/download`;
-
-      // Criar form data para enviar
-      const requestBody = JSON.stringify({ url });
-
-      // Fazer requisição
-      const response = await fetch(downloadUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      });
-
-      if (!response.ok) {
-        // Tentar ler erro como JSON
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Erro ao processar o vídeo');
-        } catch {
-          throw new Error('Erro ao processar o vídeo');
-        }
-      }
-
-      // Pegar nome do arquivo do header Content-Disposition
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'video.mp4';
-      if (contentDisposition) {
-        const matches = /filename="?(.+)"?/i.exec(contentDisposition);
-        if (matches && matches[1]) {
-          filename = matches[1];
-        }
-      }
-
-      // Converter response para blob
-      const blob = await response.blob();
-
-      // Criar URL temporária do blob
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      // Atualizar resultado
-      setResult({
-        success: true,
-        title: filename.replace('.mp4', ''),
-        downloadUrl: blobUrl,
-        fileName: filename,
-      });
-
-      setModalState('success');
-    } catch (err) {
-      setError(err.message);
-      setModalState('error');
+  // --- MUDANÇA 2: Função que o botão DENTRO do modal vai chamar ---
+  // Esta função aciona o download real e fecha o modal.
+  const handleFinalDownload = () => {
+    // Encontra o formulário invisível e o submete
+    const form = document.getElementById('downloadForm');
+    if (form) {
+      form.submit(); // Isso inicia o download direto no navegador!
     }
+
+    // Fecha o modal
+    closeModal();
   };
 
   // Fechar modal
   const closeModal = () => {
     setShowModal(false);
-    setModalState('loading');
-    setResult(null);
-    setError('');
-  };
-
-  // Baixar e fechar modal
-  const handleDownloadClick = () => {
-    // O download acontece automaticamente pelo link
-    // Fechar modal após um pequeno delay
-    setTimeout(() => {
-      closeModal();
-    }, 500);
   };
 
   return (
@@ -117,17 +59,18 @@ export default function Home() {
 
         {/* Disclaimer Legal */}
         <div style={styles.disclaimer}>
+          {/* ... (seu disclaimer continua igual) ... */}
           <strong>⚠️ AVISO LEGAL:</strong>
-          <p>
-            Este serviço é fornecido apenas para fins educacionais e pessoais.
-            Você é responsável por garantir que possui os direitos autorais
-            ou permissão para baixar o conteúdo. O uso indevido pode violar
-            as leis de direitos autorais.
-          </p>
+          <p>
+            Este serviço é fornecido apenas para fins educacionais e pessoais.
+            Você é responsável por garantir que possui os direitos autorais
+            ou permissão para baixar o conteúdo. O uso indevido pode violar
+            as leis de direitos autorais.
+          </p>
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleDownload} style={styles.form}>
+        {/* MUDANÇA 3: O formulário principal agora chama handleOpenModal */}
+        <form onSubmit={handleOpenModal} style={styles.form}>
           <input
             type="text"
             placeholder="Cole a URL do vídeo aqui..."
@@ -137,7 +80,6 @@ export default function Home() {
             disabled={showModal}
           />
 
-          {/* Checkbox obrigatório */}
           <label style={styles.checkbox}>
             <input
               type="checkbox"
@@ -171,14 +113,28 @@ export default function Home() {
 
         {/* Footer com informações */}
         <div style={styles.footer}>
-          <p>Suporta vídeos de YouTube, TikTok, Instagram e outras plataformas.</p>
-          <p style={styles.footerSmall}>
-            Use responsavelmente. Respeite os direitos autorais.
-          </p>
+           {/* ... (seu footer continua igual) ... */}
+           <p>Suporta vídeos de YouTube, TikTok, Instagram e outras plataformas.</p>
+          <p style={styles.footerSmall}>
+            Use responsavelmente. Respeite os direitos autorais.
+          </p>
         </div>
       </div>
 
-      {/* Modal de Download */}
+      {/* --- MUDANÇA 4: FORMULÁRIO INVISÍVEL ADICIONADO --- */}
+      {/* Este formulário é quem vai falar com o backend */}
+      <form
+        id="downloadForm"
+        method="POST"
+        // Ação aponta para a rota /api/download (vídeo inteiro)
+        action={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/api/download`}
+        style={{ display: 'none' }}
+      >
+        <input type="hidden" name="url" value={url} />
+      </form>
+
+      {/* MUDANÇA 5: O MODAL FOI SIMPLIFICADO */}
+      {/* Ele não tem mais 'loading', 'success', 'error'. Ele só abre. */}
       {showModal && (
         <div style={styles.modalOverlay} onClick={closeModal}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -186,66 +142,26 @@ export default function Home() {
             <button style={styles.closeButton} onClick={closeModal}>
               ✕
             </button>
+            
+            <h2 style={styles.modalTitle}>Seu download está pronto!</h2>
+            <p style={styles.modalText}>
+              Clique no botão abaixo para iniciar o download direto para sua máquina.
+            </p>
 
-            {/* Estado: Loading */}
-            {modalState === 'loading' && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.spinner}></div>
-                </div>
-                <h2 style={styles.modalTitle}>Processando Vídeo...</h2>
-                <p style={styles.modalText}>
-                  Estamos extraindo as informações do vídeo. Aguarde um momento.
-                </p>
+            {/* --- AQUI VOCÊ COLOCA O ADSENSE --- */}
+            <div style={styles.adPlaceholder}>
+              <p>(Espaço reservado para Anúncios do AdSense)</p>
+            </div>
+            {/* --- FIM DO ESPAÇO DO ADSENSE --- */}
 
-                {/* Progress bar indeterminada */}
-                <div style={styles.progressBarContainer}>
-                  <div style={styles.progressBar}></div>
-                </div>
+            {/* O botão de download final que aciona o formulário invisível */}
+            <button
+              style={styles.downloadButtonEnabled}
+              onClick={handleFinalDownload}
+            >
+              📥 Baixar Vídeo Agora
+            </button>
 
-                <button style={styles.downloadButtonDisabled} disabled>
-                  Aguarde...
-                </button>
-              </>
-            )}
-
-            {/* Estado: Success */}
-            {modalState === 'success' && result && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.successIcon}>✓</div>
-                </div>
-                <h2 style={styles.modalTitle}>Vídeo Pronto!</h2>
-                <p style={styles.modalVideoTitle}>🎬 {result.title}</p>
-                {result.fileSize && (
-                  <p style={styles.modalText}>📦 Tamanho: {result.fileSize}</p>
-                )}
-
-                <a
-                  href={result.downloadUrl}
-                  download
-                  style={styles.downloadButtonEnabled}
-                  onClick={handleDownloadClick}
-                >
-                  📥 Baixar Vídeo
-                </a>
-              </>
-            )}
-
-            {/* Estado: Error */}
-            {modalState === 'error' && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.errorIcon}>✕</div>
-                </div>
-                <h2 style={styles.modalTitle}>Erro no Processamento</h2>
-                <p style={styles.modalErrorText}>❌ {error}</p>
-
-                <button style={styles.closeButtonModal} onClick={closeModal}>
-                  Fechar
-                </button>
-              </>
-            )}
           </div>
         </div>
       )}
@@ -253,7 +169,9 @@ export default function Home() {
   );
 }
 
-// Estilos CSS inline
+// --- MUDANÇA 6: ESTILOS ---
+// Adicionei 'adPlaceholder' e simplifiquei os estilos do modal
+// (Os estilos que você já tinha estão aqui, só adicionei/removi o necessário)
 const styles = {
   container: {
     minHeight: '100vh',
@@ -340,32 +258,6 @@ const styles = {
     borderRadius: '8px',
     color: '#721c24',
   },
-  result: {
-    marginTop: '20px',
-    padding: '20px',
-    backgroundColor: '#d4edda',
-    border: '1px solid #c3e6cb',
-    borderRadius: '8px',
-  },
-  resultTitle: {
-    margin: '0 0 10px 0',
-    color: '#155724',
-  },
-  videoTitle: {
-    margin: '0 0 15px 0',
-    color: '#155724',
-    fontWeight: 'bold',
-  },
-  downloadButton: {
-    display: 'inline-block',
-    padding: '12px 24px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    textDecoration: 'none',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    transition: 'background-color 0.3s',
-  },
   footer: {
     marginTop: '30px',
     paddingTop: '20px',
@@ -379,7 +271,7 @@ const styles = {
     marginTop: '5px',
   },
 
-  // Estilos do Modal
+  // --- Estilos do Modal (Simplificados) ---
   modalOverlay: {
     position: 'fixed',
     top: 0,
@@ -421,92 +313,25 @@ const styles = {
     borderRadius: '50%',
     transition: 'all 0.3s',
   },
-  modalIcon: {
-    marginBottom: '20px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  spinner: {
-    width: '60px',
-    height: '60px',
-    border: '6px solid #f3f3f3',
-    borderTop: '6px solid #667eea',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-  successIcon: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    backgroundColor: '#28a745',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '36px',
-    fontWeight: 'bold',
-  },
-  errorIcon: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '36px',
-    fontWeight: 'bold',
-  },
   modalTitle: {
     margin: '0 0 15px 0',
     fontSize: '24px',
     color: '#333',
   },
   modalText: {
-    margin: '10px 0',
+    margin: '10px 0 20px 0',
     fontSize: '14px',
     color: '#666',
   },
-  modalVideoTitle: {
-    margin: '10px 0 20px 0',
-    fontSize: '16px',
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  modalErrorText: {
-    margin: '10px 0 20px 0',
-    fontSize: '14px',
-    color: '#dc3545',
-    padding: '15px',
-    backgroundColor: '#f8d7da',
-    borderRadius: '8px',
-  },
-  progressBarContainer: {
-    width: '100%',
-    height: '6px',
-    backgroundColor: '#f0f0f0',
-    borderRadius: '3px',
-    overflow: 'hidden',
-    margin: '20px 0',
-  },
-  progressBar: {
-    height: '100%',
-    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-    animation: 'progressIndeterminate 1.5s ease-in-out infinite',
-    width: '40%',
-  },
-  downloadButtonDisabled: {
-    width: '100%',
-    padding: '15px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#999',
-    backgroundColor: '#e0e0e0',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'not-allowed',
-    marginTop: '10px',
+  // --- NOVO ESTILO PARA O AD ---
+  adPlaceholder: {
+      border: '2px dashed #ccc',
+      padding: '40px',
+      margin: '25px 0',
+      textAlign: 'center',
+      color: '#999',
+      fontSize: '14px',
+      backgroundColor: '#fafafa',
   },
   downloadButtonEnabled: {
     display: 'block',
@@ -524,17 +349,23 @@ const styles = {
     transition: 'background-color 0.3s',
     marginTop: '10px',
   },
-  closeButtonModal: {
-    width: '100%',
-    padding: '15px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: 'white',
-    backgroundColor: '#667eea',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    marginTop: '10px',
-    transition: 'background-color 0.3s',
-  },
 };
+
+// Adiciona as animações CSS globalmente
+const keyframesStyle = `
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+`;
+if (typeof window !== 'undefined' && document.styleSheets.length > 0) {
+  const styleSheet = document.styleSheets[0];
+  const rules = Array.from(styleSheet.cssRules).map(rule => rule.name);
+  if (!rules.includes('fadeIn')) {
+      styleSheet.insertRule(keyframesStyle, styleSheet.cssRules.length);
+  }
+}
