@@ -8,6 +8,7 @@ export default function Home() {
   const [showModal, setShowModal] = useState(false);
   // Não precisamos mais de 'modalState', 'result', ou 'error'
   const [formError, setFormError] = useState('');
+  const [quality, setQuality] = useState('1080p');
 
   // --- MUDANÇA 1: Função de submit do formulário principal ---
   // Esta função agora SÓ valida os dados e ABRE O MODAL.
@@ -80,6 +81,24 @@ export default function Home() {
             disabled={showModal}
           />
 
+          <div style={styles.qualitySelector}>
+            <label htmlFor="qualitySelect" style={styles.selectLabel}>
+              Selecione a Qualidade:
+            </label>
+            <select
+              id="qualitySelect"
+              style={styles.select}
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              disabled={showModal}
+            >
+              <option value="best">Melhor Disponível (Pode ser 4K+)</option>
+              <option value="1080p">1080p (Full HD - Padrão)</option>
+              <option value="720p">720p (HD)</option>
+              <option value="360p">360p (Baixa Qualidade)</option>
+            </select>
+          </div>
+
           <label style={styles.checkbox}>
             <input
               type="checkbox"
@@ -131,6 +150,7 @@ export default function Home() {
         style={{ display: 'none' }}
       >
         <input type="hidden" name="url" value={url} />
+        <input type="hidden" name="quality" value={quality} />
       </form>
 
       {/* MUDANÇA 5: O MODAL FOI SIMPLIFICADO */}
@@ -269,6 +289,26 @@ const styles = {
   footerSmall: {
     fontSize: '12px',
     marginTop: '5px',
+  },
+  qualitySelector: {
+    textAlign: 'left',
+  },
+  selectLabel: {
+    display: 'block',
+    marginBottom: '8px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  select: {
+    width: '100%',
+    padding: '12px',
+    fontSize: '16px',
+    border: '2px solid #ddd',
+    borderRadius: '8px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    outline: 'none',
   },
 
   // --- Estilos do Modal (Simplificados) ---
