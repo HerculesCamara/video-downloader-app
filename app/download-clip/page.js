@@ -1,9 +1,9 @@
 'use client'; // Necessário se estiver usando App Router
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Ou 'next/router' se usar Pages Router
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation'; // Ou 'next/router' se usar Pages Router
 
-export default function DownloadClipPage() {
+function DownloadClipContent() {
   // --- NOVOS ESTADOS PARA O MODAL ---
   const [showModal, setShowModal] = useState(false);
   const [modalState, setModalState] = useState('loading'); // 'loading', 'success', 'error'
@@ -557,4 +557,22 @@ if (typeof window !== 'undefined' && document.styleSheets.length > 0) {
   if (!rules.includes('spin')) {
     styleSheet.insertRule(keyframesStyle, styleSheet.cssRules.length);
   }
+}
+
+export default function DownloadClipPage() {
+  return (
+    <Suspense fallback={
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>Preparando seu Clipe</h1>
+          <p style={styles.subtitle}>Carregando...</p>
+          <div style={styles.spinnerContainer}>
+            <div style={styles.spinner}></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <DownloadClipContent />
+    </Suspense>
+  );
 }
