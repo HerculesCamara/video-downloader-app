@@ -3,21 +3,45 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation'; // Ou 'next/router' se usar Pages Router
 
-function DownloadClipContent() {
-  // --- NOVOS ESTADOS PARA O MODAL ---
-  const [showModal, setShowModal] = useState(false);
-  const [modalState, setModalState] = useState('loading'); // 'loading', 'success', 'error'
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  // --- FIM DOS NOVOS ESTADOS ---
+// O Suspense é uma boa prática para o useSearchParams
+export default function DownloadClipPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <DownloadClipContent />
+    </Suspense>
+  );
+}
 
-  // Estados antigos
-  const [status, setStatus] = useState('loading'); // loading, ready, error
+// O componente de Spinner para o Suspense
+function LoadingSpinner() {
+  return (
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Preparando seu Clipe</h1>
+        <p style={styles.subtitle}>Carregando...</p>
+        <div style={styles.spinnerContainer}>
+          <div style={styles.spinner}></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- COMPONENTE PRINCIPAL DA PÁGINA ---
+function DownloadClipContent() {
+  // --- ESTADO DO MODAL ---
+  const [showModal, setShowModal] = useState(false);
+  
+  // --- NOVO ESTADO PARA O AVISO ---
+  const [showNotification, setShowNotification] = useState(false);
+  
+  // Estados da Página
+  const [status, setStatus] = useState('loading'); // loading, ready, error, downloading
   const [errorMessage, setErrorMessage] = useState('');
   const [videoId, setVideoId] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [quality, setQuality] = useState('1080p');
+  const [quality, setQuality] = useState('1080p'); // Padrão 1080p
 
   const searchParams = useSearchParams();
 
@@ -38,94 +62,51 @@ function DownloadClipContent() {
     }
   }, [searchParams]);
 
-  // --- FUNÇÃO DE DOWNLOAD ATUALIZADA (AGORA USA 'FETCH' E ABRE O MODAL) ---
-  const handleDownload = async () => {
-    if (status === 'downloading') return; // Previne cliques duplos
+  // Função de ABRIR O MODAL (Sem mudança)
+  const handleOpenModal = () => {
+    if (status === 'downloading') return;
+    setShowModal(true); // Apenas abre o modal
+  };
 
-    setStatus('downloading'); // Desabilita o botão principal
-    setShowModal(true);       // Abre o modal
-    setModalState('loading'); // Coloca o modal em modo "loading"
-    setResult(null);
-    setError('');
-
-    try {
-      // O backend espera 'Form Data', então vamos construir
-      const formData = new FormData();
-      formData.append('videoId', videoId);
-      formData.append('start_time', startTime);
-      formData.append('end_time', endTime);
-      formData.append('quality', quality);
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-      const downloadUrl = `${apiUrl}/api/download-segment`;
-
-      // Fazer a requisição 'fetch'
-      const response = await fetch(downloadUrl, {
-        method: 'POST',
-        body: formData, // Envia como Form Data
-        // Não defina 'Content-Type', o navegador faz isso automaticamente para FormData
-      });
-
-      if (!response.ok) {
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Erro ao processar o clipe');
-        } catch {
-          throw new Error('Erro ao processar o clipe');
-        }
-      }
-
-      // Pegar nome do arquivo do header
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'clipe.mp4';
-      if (contentDisposition) {
-        const matches = /filename="?(.+)"?/i.exec(contentDisposition);
-        if (matches && matches[1]) {
-          filename = matches[1];
-        }
-      }
-
-      // Converter response para blob
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      // Atualizar resultado e mudar o modal para "success"
-      setResult({
-        success: true,
-        title: filename.replace('.mp4', ''),
-        downloadUrl: blobUrl,
-        fileName: filename,
-      });
-      setModalState('success');
-
-    } catch (err) {
-      setError(err.message);
-      setModalState('error');
+  // --- MUDANÇA: Função de DOWNLOAD FINAL ---
+  // O botão DENTRO do modal chama esta função
+  const handleFinalDownload = () => {
+    setStatus('downloading'); // Mostra "Download em andamento..." no botão principal
+    setShowNotification(true); // <-- ATIVA A FAIXA DE AVISO AQUI
+    
+    // Encontra o formulário invisível e o submete
+    const form = document.getElementById('downloadSegmentForm');
+    if (form) {
+      form.submit(); // Isso inicia o download direto no navegador!
     }
 
-    // Re-abilita o botão principal da página
-    setStatus('ready');
+    // Fecha o modal
+    closeModal();
   };
 
-  // --- FUNÇÕES DO MODAL ---
+  // Função para fechar o modal
   const closeModal = () => {
     setShowModal(false);
-    setModalState('loading');
-    setResult(null);
-    setError('');
-  };
-
-  const handleDownloadClickFromModal = () => {
-    // Apenas fecha o modal, o link <a> faz o download
-    setTimeout(() => {
-      closeModal();
-    }, 500);
+    // Não reseta mais o status aqui, para o botão continuar "downloading"
+    // if (status !== 'downloading') {
+    //     setStatus('ready');
+    // }
   };
 
   // --- RENDERIZAÇÃO DA PÁGINA ---
   return (
     <div style={styles.container}>
       <div style={styles.card}>
+
+        {/* --- MUDANÇA: FAIXA DE AVISO NO TOPO --- */}
+        {showNotification && (
+          <div style={styles.notificationBanner}>
+            <span>⏳</span> 
+            O processamento no servidor foi iniciado. Seu download começará em breve (pode levar de 30s a 2min).
+          </div>
+        )}
+        {/* --- FIM DA MUDANÇA --- */}
+
         <h1 style={styles.title}>Preparando seu Clipe</h1>
 
         {/* --- ESTADO DE CARREGAMENTO (da página) --- */}
@@ -149,7 +130,7 @@ function DownloadClipContent() {
           </>
         )}
 
-        {/* --- ESTADO PRONTO PARA DOWNLOAD --- */}
+        {/* --- ESTADO PRONTO (página carregada) --- */}
         {status === 'ready' || status === 'downloading' ? (
           <>
             <p style={styles.subtitle}>Seu clipe está pronto para ser baixado!</p>
@@ -182,86 +163,61 @@ function DownloadClipContent() {
               <p>(Espaço reservado para Anúncios do AdSense 1)</p>
             </div>
 
+            {/* Botão principal agora chama handleOpenModal */}
             <button
-              onClick={handleDownload}
+              onClick={handleOpenModal} 
               style={{...styles.button, ...(status === 'downloading' ? styles.buttonDisabled : {})}}
               disabled={status === 'downloading'}
             >
-              {status === 'downloading' ? 'Preparando...' : '📥 Iniciar Download do Clipe'}
+              {status === 'downloading' ? 'Download em andamento...' : '📥 Iniciar Download do Clipe'}
             </button>
-            {/* O formulário invisível não é mais necessário aqui */}
+            {/* O infoText não é mais necessário, já que temos o banner
+            {status === 'downloading' && <p style={styles.infoText}>Confira o progresso no seu navegador.</p>}
+            */}
+
+             {/* Formulário invisível (continua o mesmo) */}
+            <form
+                id="downloadSegmentForm"
+                method="POST"
+                action={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/api/download-segment`}
+                style={{ display: 'none' }}
+            >
+                <input type="hidden" name="videoId" value={videoId} />
+                <input type="hidden" name="start_time" value={startTime} />
+                <input type="hidden" name="end_time" value={endTime} />
+                <input type="hidden" name="quality" value={quality} />
+            </form>
           </>
         ) : null}
       </div>
 
-      {/* --- MODAL DE DOWNLOAD --- */}
+      {/* --- O MODAL (PARA ADSENSE) --- */}
       {showModal && (
         <div style={styles.modalOverlay} onClick={closeModal}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <button style={styles.closeButton} onClick={closeModal}>✕</button>
 
-            {/* Estado: Loading (Enquanto o backend "Salva e Serve") */}
-            {modalState === 'loading' && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.spinner}></div>
-                </div>
-                <h2 style={styles.modalTitle}>Preparando seu Clipe...</h2>
-                <p style={styles.modalText}>
-                  Nosso servidor está baixando e cortando seu vídeo.
-                </p>
-                {/* O TEXTO QUE VOCÊ QUERIA! */}
-                <p style={styles.modalTextSmall}>
-                  <strong>Isso pode levar de 30 segundos a 2 minutos, por favor, aguarde.</strong>
-                </p>
-                
-                {/* ANÚNCIO 2 (DENTRO DO MODAL) */}
-                <div style={styles.adPlaceholderModal}>
-                  <p>(Espaço reservado para AdSense 2)</p>
-                </div>
+            <h2 style={styles.modalTitle}>Seu download está pronto!</h2>
+            <p style={styles.modalText}>
+              O clipe será baixado direto para sua máquina.
+            </p>
+            <p style={styles.modalTextSmall}>
+              <strong>O processamento no servidor pode levar de 30 segundos a 2 minutos. O download iniciará em instantes...</strong>
+            </p>
+            
+            {/* ANÚNCIO 2 (DENTRO DO MODAL) */}
+            <div style={styles.adPlaceholderModal}>
+              <p>(Espaço reservado para AdSense 2)</p>
+            </div>
 
-                <button style={styles.downloadButtonDisabled} disabled>
-                  Aguarde...
-                </button>
-              </>
-            )}
-
-            {/* Estado: Success */}
-            {modalState === 'success' && result && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.successIcon}>✓</div>
-                </div>
-                <h2 style={styles.modalTitle}>Clipe Pronto!</h2>
-                <p style={styles.modalVideoTitle}>🎬 {result.title}</p>
-                
-                {/* ANÚNCIO 2 (TAMBÉM PODE IR AQUI) */}
-                {/* <div style={styles.adPlaceholderModal}><p>(AdSense 2)</p></div> */}
-
-                <a
-                  href={result.downloadUrl}
-                  download={result.fileName}
-                  style={styles.downloadButtonEnabled}
-                  onClick={handleDownloadClickFromModal}
-                >
-                  📥 Baixar Agora
-                </a>
-              </>
-            )}
-
-            {/* Estado: Error */}
-            {modalState === 'error' && (
-              <>
-                <div style={styles.modalIcon}>
-                  <div style={styles.errorIcon}>✕</div>
-                </div>
-                <h2 style={styles.modalTitle}>Erro no Processamento</h2>
-                <p style={styles.modalErrorText}>❌ {error}</p>
-                <button style={styles.closeButtonModal} onClick={closeModal}>
-                  Fechar
-                </button>
-              </>
-            )}
+            {/* O botão de download final que aciona o formulário */}
+            <button
+              style={styles.downloadButtonEnabled}
+              onClick={handleFinalDownload} 
+            >
+              📥 Baixar Agora
+            </button>
+            
           </div>
         </div>
       )}
@@ -270,8 +226,26 @@ function DownloadClipContent() {
 }
 
 // --- ESTILOS ---
-// Adicionei os estilos do Modal que estavam na sua Home.js
+// Vou adicionar o estilo para 'notificationBanner'
 const styles = {
+  // --- NOVO ESTILO PARA O BANNER ---
+  notificationBanner: {
+    backgroundColor: '#e6f7ff',
+    border: '1px solid #91d5ff',
+    color: '#0056b3',
+    padding: '15px',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    textAlign: 'center',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    animation: 'fadeIn 0.5s ease', // Animação
+  },
+  // --- FIM DO NOVO ESTILO ---
+
   container: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
@@ -384,7 +358,7 @@ const styles = {
     marginTop: '10px',
   },
 
-  // --- Estilos do Modal (Copiados da sua Home.js) ---
+  // --- Estilos do Modal ---
   modalOverlay: {
     position: 'fixed',
     top: 0,
@@ -426,63 +400,20 @@ const styles = {
     borderRadius: '50%',
     transition: 'all 0.3s',
   },
-  modalIcon: {
-    marginBottom: '20px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  successIcon: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    backgroundColor: '#28a745',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '36px',
-    fontWeight: 'bold',
-  },
-  errorIcon: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '50%',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '36px',
-    fontWeight: 'bold',
-  },
   modalTitle: {
     margin: '0 0 15px 0',
     fontSize: '24px',
     color: '#333',
   },
   modalText: {
-    margin: '10px 0',
+    margin: '10px 0 5px 0',
     fontSize: '14px',
     color: '#666',
   },
-  modalTextSmall: { // Para o aviso de tempo
-    margin: '10px 0 20px 0',
+  modalTextSmall: { // O aviso de tempo
+    margin: '0 0 20px 0',
     fontSize: '12px',
     color: '#888',
-  },
-  modalVideoTitle: {
-    margin: '10px 0 20px 0',
-    fontSize: '16px',
-    color: '#333',
-    fontWeight: 'bold',
-  },
-  modalErrorText: {
-    margin: '10px 0 20px 0',
-    fontSize: '14px',
-    color: '#dc3545',
-    padding: '15px',
-    backgroundColor: '#f8d7da',
-    borderRadius: '8px',
   },
   adPlaceholderModal: { // Placeholder para o Ad no Modal
     border: '2px dashed #ccc',
@@ -493,19 +424,7 @@ const styles = {
     fontSize: '12px',
     backgroundColor: '#fafafa',
   },
-  downloadButtonDisabled: {
-    width: '100%',
-    padding: '15px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#999',
-    backgroundColor: '#e0e0e0',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'not-allowed',
-    marginTop: '10px',
-  },
-  downloadButtonEnabled: {
+  downloadButtonEnabled: { // O botão de download final
     display: 'block',
     width: '100%',
     padding: '15px',
@@ -520,19 +439,6 @@ const styles = {
     textAlign: 'center',
     transition: 'background-color 0.3s',
     marginTop: '10px',
-  },
-  closeButtonModal: {
-    width: '100%',
-    padding: '15px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: 'white',
-    backgroundColor: '#667eea',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    marginTop: '10px',
-    transition: 'background-color 0.3s',
   },
 };
 
@@ -555,24 +461,6 @@ if (typeof window !== 'undefined' && document.styleSheets.length > 0) {
   const styleSheet = document.styleSheets[0];
   const rules = Array.from(styleSheet.cssRules).map(rule => rule.name);
   if (!rules.includes('spin')) {
-    styleSheet.insertRule(keyframesStyle, styleSheet.cssRules.length);
+      styleSheet.insertRule(keyframesStyle, styleSheet.cssRules.length);
   }
-}
-
-export default function DownloadClipPage() {
-  return (
-    <Suspense fallback={
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Preparando seu Clipe</h1>
-          <p style={styles.subtitle}>Carregando...</p>
-          <div style={styles.spinnerContainer}>
-            <div style={styles.spinner}></div>
-          </div>
-        </div>
-      </div>
-    }>
-      <DownloadClipContent />
-    </Suspense>
-  );
 }
